@@ -57,7 +57,13 @@ async function onForm1Submit(event) {
 
 	if (json.error) {
 		setDialog1(json.error);
+		this.fieldset.disabled = null;
+		return;
 	}
+
+	this.username.value = "Re: " + sanitizeText(json.username);
+	this.password.value = "Re: " + sanitizeText(json.username);
+	this.confirmation.value = "Re: " + sanitizeText(json.username);
 
 	this.fieldset.disabled = null;
 }
