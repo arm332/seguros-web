@@ -11,18 +11,15 @@
 		<link href="style.css" rel="stylesheet" type="text/css" />
 	</head>
 	<body>
-		<noscript>Sorry, this site requires JavaScript enabled.</noscript>
 		<form id="signup">
-			<legend>Sign Up</legend>
+			<p>Sign Up</p>
 			<input autocomplete="username" autofocus="yes" name="username" pattern="[\w\-.]{8,}" placeholder="Username" required="yes" value="username123" />
 			<input name="password" pattern="[\w\x20-\x40]{8,}" placeholder="Password" required="yes" type="password" value="password123" />
 			<input name="confirmation" placeholder="Password confirmation" required="yes" type="password" value="password123" />
-			<input name="send" type="submit" value="Sign Up" />
+			<input type="submit" value="Sign Up" />
 		</form>
-		<dialog id="message">
-			<form method="dialog">
-				<input type="button" value="OK" />
-			</form>
+		<dialog id="message" open="yes">
+			<noscript>Sorry, this site requires JavaScript enabled.</noscript>
 		</dialog>
 		<script type="text/javascript" src="script.js"></script>
 	</body>
