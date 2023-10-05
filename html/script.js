@@ -1,101 +1,109 @@
 "use strict";
 
-// Document ready.
+// Window events.
 
 self.addEventListener("DOMContentLoaded", function(event) {
 	console.log("self.DOMContentLoaded");
-
-	// Remove the NOSCRIPT HTML tag from the dialog.
-
-	while (dialog1.lastChild) dialog1.removeChild(dialog1.lastChild);
-
-	// Set event handlers.
-
-	dialog1.addEventListener("click", onDialog1Click, false);
-	form1.addEventListener("submit", onForm1Submit, false);
-
-	// Close the dialog.
-
-	dialog1.close();
 });
 
-// Dialog1 events.
+// Sign up form events.
+// Form element value property is a Safe Sink.
+// See <https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html#safe-sinks>
 
-function onDialog1Click(event) {
-	console.log("onDialog1Click");
-	dialog1.close();
-}
-
-// Dialog1 functions.
-
-function setDialog1(textContent = "") {
-	console.log("setDialog1");
-	dialog1.textContent = textContent;
-	dialog1.showModal();
-}
-
-// Form1 events.
-
-async function onForm1Submit(event) {
-	console.log("onForm1Submit");
+signup.addEventListener("submit", async function(event) {
+	console.log("signup.submit");
 	event.preventDefault();
-
-	// const form = this;
-	this.fieldset.disabled = true;
 
 	const username = this.username.value.trim();
 	const password = this.password.value.trim();
 	const confirmation = this.confirmation.value.trim();
+	this.send.disabled = true;
 
-	// TODO: username != ""
-	// TODO: password != ""
-	// TODO: password == confirmation
-
-	const data = {username, password, confirmation};
-	const json = await fetchURL("/signup1", data);
-	console.log(json);
-
-	if (json.error) {
-		setDialog1(json.error);
-		this.fieldset.disabled = null;
+	if (!username.match(/[\w\-.]{8,}/)) {
+		setMessage("Username invalid.");
+		this.send.disabled = null;
 		return;
 	}
 
-	this.username.value = "Re: " + sanitizeText(json.username);
-	this.password.value = "Re: " + sanitizeText(json.username);
-	this.confirmation.value = "Re: " + sanitizeText(json.username);
+	if (!password.match(/[\w\x20-\x40]{8,}/)) {
+		setMessage("Password invalid.");
+		this.send.disabled = null;
+		return;
+	}
 
-	this.fieldset.disabled = null;
+	if (password !== confirmation) {
+		setMessage("Password confirmation incorrect.");
+		this.send.disabled = null;
+		return;
+	}
+
+	const data = {username, password, confirmation};
+	const json = await fetchData("/signup", data);
+
+	if (json.error) {
+		setMessage(json.error);
+		this.send.disabled = null;
+		return;
+	}
+
+	this.username.value = json.username;
+	this.password.value = json.username;
+	this.confirmation.value = json.username;
+	this.send.disabled = null;
+
+	setMessage("ID: " + json.id);
+});
+
+// Messsage dialog events.
+
+message.addEventListener("click", function(event) {
+	console.log("message.click");
+
+	this.close();
+});
+
+// Message dialog functions.
+// Node textContent property is a Safe Sink.
+// See <https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html#safe-sinks>
+
+function setMessage(textContent = "") {
+	console.log("setMessage");
+	message.textContent = textContent;
+	message.showModal();
 }
 
-// Utils
+// Utils.
 
-async function fetchURL(url, data = {}) {
+function fetchData(url, data = {}) {
 	console.log("fetchData");
 
-	const response = await fetch(url, {
-		method: "POST",
-		mode: "no-cors",
-		cache: "no-cache",
-		credentials: "same-origin",
-		headers: {"Content-Type": "application/json"},
-		redirect: "error",
-		referrerPolicy: "no-referrer",
-		body: JSON.stringify(data)
+	return fetch(url,
+		{
+			method: "POST",
+			mode: "no-cors",
+			cache: "no-cache",
+			credentials: "same-origin",
+			headers: {"Content-Type": "application/json"},
+			redirect: "error",
+			referrerPolicy: "no-referrer",
+			body: JSON.stringify(data)
+		}
+	)
+	.then(function(response) {
+		return response.json();
+	})
+	.then(function(json) {
+		return json;
 	});
-
-	const result = await response.json();
-
-	return result;
 }
 
-function sanitizeText(text) {
-	console.log("sanitizeText");
+//~ function sanitizeData(text) {
+	//~ console.log("sanitizeData");
 
-	return text.replaceAll("&", "&amp;")
-		.replaceAll("<", "&lt;")
-		.replaceAll(">", "&gt;")
-		.replaceAll('"', "&quot;")
-		.replaceAll("'", "&apos;")
-		.replaceAll("`", "&grave;");
-}
+	//~ return text.replaceAll("&", "&amp;")
+		//~ .replaceAll("<", "&lt;")
+		//~ .replaceAll(">", "&gt;")
+		//~ .replaceAll('"', "&quot;")
+		//~ .replaceAll("'", "&apos;")
+		//~ .replaceAll("`", "&grave;");
+//~ }
