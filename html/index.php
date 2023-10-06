@@ -16,8 +16,8 @@ ini_set("display_errors", APP_DEBUG);
 ini_set("error_reporting", E_ALL);
 // ini_set("error_log", "");					// TESTING: log to Nginx error log so Fail2ban...
 // ini_set("log_errors", 1);					// TESTING: always log
-// ini_set("session.cookie_domain", "");
-ini_set("session.cookie_lifetime", 604800);		// 604800 seconds to expire in 7 days; 0 (zero) expires when browser close
+// ini_set("session.cookie_domain", "");		// defaults to the host name
+ini_set("session.cookie_lifetime", 604800);		// 604800 seconds = 7 days; 0 (zero) expires when browser close
 // ini_set("session.cookie_path", "/");
 ini_set("session.cookie_httponly", 1);			// Prevent XSS
 ini_set("session.cookie_samesite", "Strict");	// Requires PHP >= 7.4
@@ -131,3 +131,4 @@ if ($path == "/signup") {
 
 //header("HTTP/1.0 404 Not Found");
 trigger_error("404 Not found", E_USER_ERROR);
+

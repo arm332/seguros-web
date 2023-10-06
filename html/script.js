@@ -1,134 +1,65 @@
 "use strict";
 
+// Globals.
+
+let timeoutId = 0;
+
 // Window events.
 
 self.addEventListener("DOMContentLoaded", function(event) {
 	console.log("window.DOMContentLoaded");
-	setMessage("OK");
+	setAlert("Loading...");
 });
 
-self.addEventListener("offline", function(event) {
-	console.log("window.offline");
-	setMessage("window.offline");
-});
-
-self.addEventListener("online", function(event) {
-	console.log("window.online");
-	setMessage("window.online");
-});
-
-// Document events.
-
-document.addEventListener("keydown", function(event) {
-	console.log("document.keydown");
-
-	if (event.key == "Escape") {
-		if (message.open) {
-			message.close();
-		}
-	}
+self.addEventListener("load", function(event) {
+	console.log("window.DOMContentLoaded");
+	setAlert("Done.");
 });
 
 // Sign up form events.
 
-signup.addEventListener("submit", async function(event) {
-	console.log("signup.submit");
+signupForm.addEventListener("click", function(event) {
+	console.log("signupForm.click");
 	event.preventDefault();
-
-	event.submitter.disabled = true;
-
-	const username = this.username.value.trim();
-	const password = this.password.value.trim();
-	const confirmation = this.confirmation.value.trim();
-
-	if (!username.match(/[\w\-.]{8,}/)) {
-		setMessage("Username invalid.");
-		event.submitter.disabled = null;
-		return;
-	}
-
-	if (!password.match(/[\w\x20-\x40]{8,}/)) {
-		setMessage("Password invalid.");
-		event.submitter.disabled = null;
-		return;
-	}
-
-	if (password !== confirmation) {
-		setMessage("Password confirmation incorrect.");
-		event.submitter.disabled = null;
-		return;
-	}
-
-	const data = {username, password, confirmation};
-	const json = await fetchData("/signup", data);
-
-	if (json.error) {
-		setMessage(json.error);
-		event.submitter.disabled = null;
-		return;
-	}
-
-	// HTMLInputElement value property is a Safe Sink.
-	// See <https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html#safe-sinks>
-
-	this.username.value = json.username;
-	this.password.value = json.username;
-	this.confirmation.value = json.username;
-
-	setMessage("ID: " + json.id);
-	event.submitter.disabled = null;
+	setAlert("Done.");
 });
 
 // Messsage dialog events.
 
-message.addEventListener("click", function(event) {
-	console.log("message.click");
-
-	this.close();
+alertDialog.addEventListener("click", function(event) {
+	console.log("alertDialog.click");
+	setAlert();
 });
 
-// Message dialog functions.
+// Alert dialog functions.
 
-function setMessage(textContent = null) {
-	console.log("setMessage");
+function setAlert(textContent = null) {
+	console.log("setAlert");
+
+	//
+
+	clearTimeout(timeoutId);
+
+	// The dialog may already be closed if the user typed Escape while the
+	// setTimeout ID is still not 0 (zero). Close the dialog before opening
+	// it so we see the message has changed and we can use showModal() even
+	// if open attribute is true. Use showModal so we can close the dialog by
+	// clicking anywere on the screen (backdrop), or by typing Escape,
+	// without a document key down event handler.
+
+	if (alertDialog.open) {
+		alertDialog.close();
+	}
 
 	// Node textContent property is a Safe Sink.
 	// See <https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html#safe-sinks>
 
 	if (textContent) {
-		message.textContent = textContent;
-		message.show();
-	}
-	else {
-		message.close();
+		alertDialog.textContent = textContent;
+		alertDialog.showModal();
+
+		// Auto-close the dialog in 5 seconds.
+
+		setTimeout(setAlert, 5000);
 	}
 }
-
-// Utils.
-
-async function fetchData(url, data = null) {
-	console.log("fetchData");
-
-	// credentials defaults to "same-origin"
-	// See <https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch>.
-
-	const response = await fetch(url, {method: "POST", mode: "no-cors",
-		cache: "no-cache", headers: {"Content-Type": "application/json"},
-		redirect: "error", referrerPolicy: "no-referrer",
-		body: JSON.stringify(data)});
-
-	const json = response.json();
-
-	return json;
-}
-
-//~ function sanitizeData(text) {
-	//~ console.log("sanitizeData");
-
-	//~ return text.replaceAll("&", "&amp;")
-		//~ .replaceAll("<", "&lt;")
-		//~ .replaceAll(">", "&gt;")
-		//~ .replaceAll('"', "&quot;")
-		//~ .replaceAll("'", "&apos;")
-		//~ .replaceAll("`", "&grave;");
-//~ }

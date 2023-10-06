@@ -16,6 +16,13 @@ body {
 	margin: 0;
 }
 
+button, input, textarea {
+	border: 1px solid ButtonBorder;
+	border-radius: 0.25rem;
+	font: inherit;
+	padding: 0.5rem;
+}
+
 dialog {
 	background: ButtonFace;
 	border: 1px solid ButtonBorder;
@@ -36,13 +43,6 @@ form {
 	gap: 0.5rem;
 	margin: 1rem;
 	padding: 0;
-}
-
-input, textarea {
-	border: 1px solid ButtonBorder;
-	border-radius: 0.25rem;
-	font: inherit;
-	padding: 0.5rem;
 }
 
 @media (min-width: 40rem) {
