@@ -24,49 +24,66 @@ signupForm.addEventListener("submit", async function(event) {
 
 	event.submitter.disabled = true;
 
-	if (self.offline) {
-		setAlert("Sorry, this site must be online to complete this action.");
-		event.submitter.disabled = null;
-		return;
-	}
-
+	const id = self.crypto.randomUUID();
 	const username = this.username.value.trim();
-
-	if (!username.match(/[\w\-.]{8,}/)) {
-		setAlert("Username invalid.");
-		event.submitter.disabled = null;
-		return;
-	}
-
-	const found = await getDatabaseUserByUsername({username});
-
-	if (found) {
-		setAlert("Username already signed up.");
-		event.submitter.disabled = null;
-		return;
-	}
-
 	const password = this.password.value.trim();
-
-	if (!password.match(/[\w\x20-\x40]{8,}/)) {
-		setAlert("Password invalid.");
-		event.submitter.disabled = null;
-		return;
-	}
-
 	const confirmation = this.confirmation.value.trim();
 
-	if (password !== confirmation) {
-		setAlert("Password confirmation incorrect.");
+	if (!username.match(/[\w\-.]{8,}/)) {
+		setAlert("Username invalid");
 		event.submitter.disabled = null;
 		return;
 	}
 
-	const id = self.crypto.randomUUID();
+	if (!password.match(/[\w\x20-\x40]{8,}/)) {
+		setAlert("Invalid password");
+		event.submitter.disabled = null;
+		return;
+	}
 
-	await setDatabaseUser({id, username, password});
+	if (password !== confirmation) {
+		setAlert("Invalid password confirmation");
+		event.submitter.disabled = null;
+		return;
+	}
 
-	setAlert("Done.");
+	const data = {id, username, password, confirmation};
+
+	try {
+		const response = await self.fetch("/signup", {method: "POST",
+			headers: {"Content-Type": "application/json"},
+			body: JSON.stringify(data)
+		});
+
+		const result = await response.json();
+
+		if (result.error) {
+			throw result.error;
+		}
+	}
+	catch(error) {
+		console.log(error);
+		setAlert(error);
+		event.submitter.disabled = null;
+		return;
+	}
+
+	const encoder = new TextEncoder();
+	const encoded = encoder.encode(password);
+	const hash = await self.crypto.subtle.digest("SHA-256", encoded);
+	const hex = buf2hex(hash); // keep all user data as text
+
+	try {
+		await setDatabaseUser({id, username, password: hash});
+	}
+	catch(error) {
+		console.log(error);
+		setAlert("Username already signed up");
+		event.submitter.disabled = null;
+		return;
+	}
+
+	setAlert("Done");
 
 	event.submitter.disabled = null;
 });
@@ -196,7 +213,7 @@ function getDatabaseUserByUsername(user) {
 }
 
 function setDatabaseUser(user) {
-	console.log("setDatabaseUser", user);
+	console.log("setDatabaseUser");
 
 	return getDatabase().then(function(db) {
 		return new Promise(function(resolve, reject) {
@@ -230,4 +247,20 @@ function setDatabaseUser(user) {
 			});
 		});
 	});
+}
+
+// See <https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/digest#converting_a_digest_to_a_hex_string>.
+
+function buf2hex(arrayBuffer) {
+	return Array.from(new Uint8Array(arrayBuffer)).map(function(b) {
+		return b.toString(16).padStart(2, "0");
+	}).join("");
+}
+
+// See <https://stackoverflow.com/a/71083193>.
+
+function hex2buf(hexString) {
+	return new Uint8Array(hexString.match(/../g).map(function(h) {
+		return parseInt(h, 16);
+	})).buffer;
 }

@@ -24,7 +24,7 @@ ini_set("session.cookie_samesite", "Strict");	// Requires PHP >= 7.4
 ini_set("session.cookie_secure", 1);			// Requires HTTPS
 ini_set("session.use_strict_mode", 1);			// Avoid session fixation
 ini_set("session.use_trans_sid", 0);			// Avoid session hijacking
-//setlocale(LC_TIME, "pt_BR");			// TODO: test this
+//setlocale(LC_TIME, "pt_BR");					// TODO: test this
 
 // You should use the mb_internal_encoding() function at the top of
 // every PHP script you write (or at the top of your global include
@@ -70,6 +70,20 @@ function app_exception_handler($ex) {
 	return app_error_handler($ex->getCode(), $ex->getMessage(), $ex->getFile(), $ex->getLine());
 }
 
+// If SQLite database is exposed to the HTTP server, it is recommended,
+// STRONGLY ADVISED, to setup the HTTP server to deny access to it.
+// See also <https://nginx.org/en/docs/http/ngx_http_access_module.html>
+// and <https://httpd.apache.org/docs/2.4/howto/access.html>.
+
+// NOTE: keep SQLite database out of the document root directory.
+
+$db = new PDO("sqlite:../data/database.sqlite");
+$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+//$db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_OBJ);
+$db->exec("CREATE TABLE IF NOT EXISTS user (id TEXT NOT NULL PRIMARY KEY, username TEXT NOT NULL UNIQUE, password TEXT NOT NULL)");
+$db->exec("CREATE TABLE IF NOT EXISTS item (id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, value TEXT)");
+
 // This cookie doesn't need GDPR pop-ups because it's strictly necessary to
 // provide the service.
 // See <https://gdpr.eu/cookies/>.
@@ -108,21 +122,67 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 
 // Sign up.
 
+// Don't use PHP sanitize filters (e.g. FILTER_SANITIZE_EMAIL).
+// It could change the submitted input from an invalid into a
+// valid state. See <https://stackoverflow.com/q/7290674>.
+
+// Don't use PHP validate filters (e.g. FILTER_VALIDATE_EMAIL).
+// On some older versions of PHP, it will accept john@gmail, which
+// is a valid email address, but probably not desirable on an
+// internet website. See <https://stackoverflow.com/a/7290702>.
+
+// If FILTER_VALIDATE_REGEXP is the only way to validate text,
+// prefer preg_match for efficiency and performance. See
+// <https://stackoverflow.com/a/29215501>.
+
+// Allways use PHP htmlentities and ENT_QUOTES to escape input
+// before outputting it into a HTML context. See
+// <http://shiflett.org/articles/cross-site-scripting> and
+// <https://stackoverflow.com/q/46483>.
+
 if ($path == "/signup") {
 	$_post = json_decode(file_get_contents("php://input"), TRUE);
+	$id = isset($_post["id"]) ? $_post["id"] : "";
+	$username = isset($_post["username"]) ? mb_strtolower(trim($_post["username"])) : "";
+	$password = isset($_post["password"]) ? trim($_post["password"]) : "";
+	$confirmation = isset($_post["confirmation"]) ? trim($_post["confirmation"]) : "";
 
-	// Generate v4 UUID.
-	// See <https://stackoverflow.com/a/15875555>.
+	if (!$id) {
+		trigger_error("Invalid ID.", E_USER_ERROR);
+	}
 
-	$data = random_bytes(16);
-	$data[6] = chr(ord($data[6]) & 0x0f | 0x40); // set version to 0100
-	$data[8] = chr(ord($data[8]) & 0x3f | 0x80); // set bits 6-7 to 10
-	$data = vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+	if (!preg_match("/[\w\-.]{8,}/", $username)) {
+		trigger_error("Invalid username", E_USER_ERROR);
+	}
 
-	//
+	if (!preg_match("/[\w\x20-\x40]{8,}/", $password)) {
+		trigger_error("Invalid password", E_USER_ERROR);
+	}
 
-	$_SESSION["user_id"] = $data;
-	$_post["id"] = $data;
+	if ($password !== $confirmation) {
+		trigger_error("Invalid password confirmation", E_USER_ERROR);
+	}
+
+	// NOTE: sign up disabled.
+
+	trigger_error("Cadastro de usuários desativado", E_USER_ERROR);
+
+	// TODO: prevent SPAM without reCAPATCHA.
+
+	$qry = $db->prepare("SELECT 1 FROM user WHERE username = ?");
+	$qry->execute(array($username));
+	$row = $qry->fetch();
+
+	if ($row) {
+		trigger_error("Username already signed up", E_USER_ERROR);
+	}
+
+	$password_hash = password_hash($password, PASSWORD_DEFAULT);
+	$qry = $db->prepare("INSERT INTO user (id, username, password) VALUES (?, ?, ?)");
+	$qry->execute(array($id, $username, $password_hash));
+	//$id = $db->lastInsertId();
+
+	$_SESSION["user_id"] = $id;
 
 	exit(json_encode($_post));
 }
