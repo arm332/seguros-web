@@ -94,17 +94,42 @@ if (!isset($_SESSION["user_id"])) {
 	$_SESSION["user_id"] = "";
 }
 
+// This policy allows images, scripts, AJAX, form actions, and CSS from the
+// same origin, and does not allow any other resources to load (eg object,
+// frame, media, etc). It is a good starting point for many sites.
+// See <https://content-security-policy.com/> and
+// <https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP>.
+
+header("Content-Security-Policy: default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self'; style-src 'self'; form-action 'self'; base-uri 'none';");
+
+// Defend against Clickjacking and workaround browsers warning messages
+// "Content-Security-Policy: Ignoring source ‘frame-ancestors’ (Not supported
+// when delivered via meta element)" and "Content-Security-Policy: Couldn’t
+// process unknown directive ‘frame-ancestors:’".
+// See <https://cheatsheetseries.owasp.org/cheatsheets/Clickjacking_Defense_Cheat_Sheet.html>
+// and <https://content-security-policy.com/frame-ancestors/>.
+
+header("X-Frame-Options: deny");
+
+// robots meta tags and X-Robots-Tag HTTP headers are discovered when a URL
+// is crawled. If a page is disallowed from crawling through the robots.txt
+// file, then any information about indexing or serving rules will not be
+// found and will therefore be ignored. If indexing or serving rules must be
+// followed, the URLs containing those rules cannot be disallowed from crawling.
+// See <https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag>,
+// <https://stackoverflow.com/questions/4769140/robots-txt-user-agent-googlebot-disallow-google-still-indexing>
+// and <https://webmasters.stackexchange.com/questions/130709/what-is-difference-between-robots-txt-sitemap-robots-meta-tag-robots-header-t>.
+
+header("X-Robots-Tag: none");
+header("X-Robots-Tag: googlebot: none");
+
 // Simple router.
 
 $path = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 
-// Use X-Frame-Options header to defend against Clickjacking and fix the
-// "Content-Security-Policy: Ignoring source ‘frame-ancestors’ (Not supported
-// when delivered via meta element)" browser console warning message.
-// See <https://cheatsheetseries.owasp.org/cheatsheets/Clickjacking_Defense_Cheat_Sheet.html>.
+// Send HTML index.
 
 if ($path === "/") {
-	header("X-Frame-Options: DENY");
 	readfile("index.html");
 	return true;
 }
@@ -148,7 +173,7 @@ if ($path == "/signup") {
 	$confirmation = isset($_post["confirmation"]) ? trim($_post["confirmation"]) : "";
 
 	if (!$id) {
-		trigger_error("Invalid ID.", E_USER_ERROR);
+		trigger_error("Invalid ID", E_USER_ERROR);
 	}
 
 	if (!preg_match("/[\w\-.]{8,}/", $username)) {
@@ -163,32 +188,48 @@ if ($path == "/signup") {
 		trigger_error("Invalid password confirmation", E_USER_ERROR);
 	}
 
-	// NOTE: sign up disabled.
+	// NOTE: disable sign ups.
 
-	trigger_error("Cadastro de usuários desativado", E_USER_ERROR);
+	//trigger_error("Sign up temporalily disabled", E_USER_ERROR);
 
 	// TODO: prevent SPAM without reCAPATCHA.
 
-	$qry = $db->prepare("SELECT 1 FROM user WHERE username = ?");
+	$qry = $db->p1repare("SELECT id, password FROM user WHERE username = ?");
 	$qry->execute(array($username));
 	$row = $qry->fetch();
 
+	// User may be logging in from a new client or is a new user.
+
 	if ($row) {
-		trigger_error("Username already signed up", E_USER_ERROR);
+		if (password_verify($password, $row["password"])) {
+			$id = $row["id"];
+
+			if (password_needs_rehash($row["password"], PASSWORD_DEFAULT)) {
+				$password_hash = password_hash($password, PASSWORD_DEFAULT);
+				$qry = $db->prepare("UPDATE user SET password = ? WHERE username = ?");
+				$qry->execute(array($password_hash, $username));
+				//$count = $qry->rowCount();
+			}
+		}
+		else {
+			trigger_error("Username already signed up", E_USER_ERROR);
+		}
+	}
+	else {
+		$password_hash = password_hash($password, PASSWORD_DEFAULT);
+		$qry = $db->prepare("INSERT INTO user (id, username, password) VALUES (?, ?, ?)");
+		$qry->execute(array($id, $username, $password_hash));
+		//$id = $db->lastInsertId();
 	}
 
-	$password_hash = password_hash($password, PASSWORD_DEFAULT);
-	$qry = $db->prepare("INSERT INTO user (id, username, password) VALUES (?, ?, ?)");
-	$qry->execute(array($id, $username, $password_hash));
-	//$id = $db->lastInsertId();
+	$response = array("user_id" => $id);
 
 	$_SESSION["user_id"] = $id;
 
-	exit(json_encode($_post));
+	exit(json_encode($response));
 }
 
 // Not found.
 
 //header("HTTP/1.0 404 Not Found");
 trigger_error("404 Not found", E_USER_ERROR);
-

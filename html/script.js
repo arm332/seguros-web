@@ -2,265 +2,150 @@
 
 // Globals.
 
+let currentId = "signup";
 let timeoutId = 0;
 
-// Window events.
+// Show errors on mobile browsers.
+
+self.addEventListener("error", function(event) {
+	console.log("window.error");
+
+	const filename = event.filename.replace(/.*\//, "");
+
+	setDialog(event.message + ", in " + filename + ", at line " + event.lineno);
+});
+
+// Document ready.
 
 self.addEventListener("DOMContentLoaded", function(event) {
 	console.log("window.DOMContentLoaded");
-	setAlert("Loading...");
+
+	setDialog("Loading...");
+
+	setPage();
 });
+
+// All resources loaded.
 
 self.addEventListener("load", function(event) {
-	console.log("window.DOMContentLoaded");
-	setAlert("Done.");
+	console.log("window.load");
+
+	setDialog("Done.");
 });
 
-// Sign up form events.
+// User is navigatin through history.
 
-signupForm.addEventListener("submit", async function(event) {
-	console.log("signupForm.submit");
-	event.preventDefault();
+self.addEventListener("popstate", function(event) {
+	console.log("popstate");
 
-	event.submitter.disabled = true;
+	setPage();
+});
 
-	const id = self.crypto.randomUUID();
-	const username = this.username.value.trim();
-	const password = this.password.value.trim();
-	const confirmation = this.confirmation.value.trim();
+// Document events.
+// Avoid event delegation bug on Safari Mobile.
+// See <https://developer.mozilla.org/en-US/docs/Web/API/Element/click_event#safari_mobile>.
 
-	if (!username.match(/[\w\-.]{8,}/)) {
-		setAlert("Username invalid");
-		event.submitter.disabled = null;
-		return;
-	}
+document.addEventListener("click", function(event) {
+	console.log("document.click");
 
-	if (!password.match(/[\w\x20-\x40]{8,}/)) {
-		setAlert("Invalid password");
-		event.submitter.disabled = null;
-		return;
-	}
+	// Match inner links only (i.e. http://www.foo.org/#bar).
 
-	if (password !== confirmation) {
-		setAlert("Invalid password confirmation");
-		event.submitter.disabled = null;
-		return;
-	}
+	if (event.target.href) {
+		const found = event.target.href.match(/.*\/#(\w+)/);
 
-	const data = {id, username, password, confirmation};
+		if (found) {
+			event.preventDefault();
 
-	try {
-		const response = await self.fetch("/signup", {method: "POST",
-			headers: {"Content-Type": "application/json"},
-			body: JSON.stringify(data)
-		});
+			const id = found[1];
 
-		const result = await response.json();
-
-		if (result.error) {
-			throw result.error;
+			if (id === "back") {
+				history.back();
+			}
+			else {
+				setPage(id);
+			}
 		}
 	}
-	catch(error) {
-		console.log(error);
-		setAlert(error);
-		event.submitter.disabled = null;
-		return;
-	}
-
-	const encoder = new TextEncoder();
-	const encoded = encoder.encode(password);
-	const hash = await self.crypto.subtle.digest("SHA-256", encoded);
-	const hex = buf2hex(hash); // keep all user data as text
-
-	try {
-		await setDatabaseUser({id, username, password: hash});
-	}
-	catch(error) {
-		console.log(error);
-		setAlert("Username already signed up");
-		event.submitter.disabled = null;
-		return;
-	}
-
-	setAlert("Done");
-
-	event.submitter.disabled = null;
 });
 
-// Alert dialog events.
+// Dialog events.
 
-alertDialog.addEventListener("click", function(event) {
-	console.log("alertDialog.click");
-	setAlert();
+dialog1.addEventListener("click", function(event) {
+	console.log("dialog1.click");
+
+	if (dialog1.open) {
+		dialog1.close();
+	}
 });
 
-// Alert dialog functions.
+// Dialog functions.
 
-function setAlert(textContent = null) {
-	console.log("setAlert");
+function setDialog(textContent = "") {
+	console.log("setDialog", textContent);
 
-	//
-
-	clearTimeout(timeoutId);
-
-	// The dialog may already be closed if the user typed Escape while the
-	// setTimeout ID is still not 0 (zero). Close the dialog before opening
-	// it so we see the message has changed and we can use showModal() even
-	// if open attribute is true. Use showModal so we can close the dialog by
-	// clicking anywere on the screen (backdrop), or by typing Escape,
-	// without a document key down event handler.
-
-	if (alertDialog.open) {
-		alertDialog.close();
+	if (timeoutId) {
+		clearTimeout(timeoutId);
 	}
 
-	// Node textContent property is a Safe Sink.
-	// See <https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html#safe-sinks>
+	if (dialog1.open) {
+		dialog1.close();
+	}
 
 	if (textContent) {
-		alertDialog.textContent = textContent;
-		alertDialog.showModal();
-
-		// Auto-close the dialog in 5 seconds.
-
-		setTimeout(setAlert, 5000);
+		timeoutId = setTimeout(setDialog, 5000);
+		dialog1.textContent = textContent;
+		dialog1.showModal();
 	}
 }
 
-// IndexedDB utils.
-// See <https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API>.
+// Page events.
 
-function getDatabase(name = "seguros-web", version = 1) {
-	console.log("getDatabase");
+signup.addEventListener("submit", async function(event) {
+	console.log("signup.submit");
+	event.preventDefault();
+});
 
-	return new Promise(function(resolve, reject) {
-		const request = self.indexedDB.open(name, version);
+signin.addEventListener("submit", async function(event) {
+	console.log("signin.submit");
+	event.preventDefault();
+});
 
-		request.addEventListener("error", function(event) {
-			console.log("getDatabase.error");
+// Page functions.
 
-			const error = event.target.error;
+function setPage(id = null) {
+	console.log("setPage", id, currentId);
 
-			reject(error);
-		});
+	const prev = document.getElementById(currentId);
 
-		request.addEventListener("upgradeneeded", function(event) {
-			console.log("getDatabase.upgradeneeded");
+	prev.classList.add("hidden");
 
-			const db = event.target.result;
+	// If history.state is empty, the user just loaded the application, so
+	// replace the first (empty) state with currentId. Contract: call this
+	// from DOMContentLoaded event with an empty id parameter.
 
-			if (event.newVersion == 1) {
-				const userStore = db.createObjectStore("user", {keyPath: "id"});
-				userStore.createIndex("username", "username", {unique: true});
+	// If history.state is NOT empty, but id parameter is empty, the user is
+	// navigating through history, so set currentId with the history.state.
+	// Contract: call this from popstate event with an empty id parameter.
 
-				const itemStore = db.createObjectStore("item", {keyPath: "id"});
-				itemStore.createIndex("username", "username"); // not unique
-			}
-		});
+	// If history.state is NOT empty and id parameter is NOT empty, the user
+	// is navigating to a new page in the application, so push the new id
+	// to history and set currentId with new id.
 
-		request.addEventListener("success", function(event) {
-			console.log("getDatabase.success");
+	if (!history.state) {
+		console.log("foo", history.state);
+		history.replaceState(currentId, "");
+	}
+	else if (!id) {
+		console.log("bar", id);
+		currentId = history.state;
+	}
+	else {
+		console.log("foobar", id);
+		history.pushState(id, "");
+		currentId = id;
+	}
 
-			const db = event.target.result;
+	const next = document.getElementById(currentId);
 
-			resolve(db);
-		});
-	});
-}
-
-function getDatabaseUser(user) {
-	console.log("getDatabaseUser");
-
-	return getDatabase().then(function(db) {
-		return new Promise(function(resolve, reject) {
-			const transaction = db.transaction("user");
-			const objectStore = transaction.objectStore("user");
-			const request = objectStore.get(user.id);
-
-			request.addEventListener("success", function(event) {
-				console.log("getDatabaseUser.success");
-
-				const record = event.target.result;
-				console.log("getDatabaseUser.record", record);
-
-				resolve(record);
-			});
-		});
-	});
-}
-
-function getDatabaseUserByUsername(user) {
-	console.log("getDatabaseUserByUsername");
-
-	return getDatabase().then(function(db) {
-		return new Promise(function(resolve, reject) {
-			const transaction = db.transaction("user");
-			const objectStore = transaction.objectStore("user");
-			const index = objectStore.index("username");
-			const request = index.get(user.username);
-
-			request.addEventListener("success", function(event) {
-				console.log("getDatabaseUserByUsername.success");
-
-				const record = event.target.result;
-				console.log("getDatabaseUserByUsername.record", record);
-
-				resolve(record);
-			});
-		});
-	});
-}
-
-function setDatabaseUser(user) {
-	console.log("setDatabaseUser");
-
-	return getDatabase().then(function(db) {
-		return new Promise(function(resolve, reject) {
-			const transaction = db.transaction(["user"], "readwrite");
-
-			transaction.addEventListener("error", function(event) {
-				console.log("setDatabaseUser.error");
-
-				const error = event.target.error;
-
-				reject(error);
-			});
-
-			transaction.addEventListener("complete", function(event) {
-				console.log("setDatabaseUser.complete");
-
-				//const transaction = event.target;
-
-				resolve(true);
-			});
-
-			const objectStore = transaction.objectStore("user");
-			const request = objectStore.add(user);
-
-			request.addEventListener("success", function(event) {
-				console.log("setDatabaseUser.success");
-
-				//const key = event.target.result;
-
-				//resolve(key);
-			});
-		});
-	});
-}
-
-// See <https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/digest#converting_a_digest_to_a_hex_string>.
-
-function buf2hex(arrayBuffer) {
-	return Array.from(new Uint8Array(arrayBuffer)).map(function(b) {
-		return b.toString(16).padStart(2, "0");
-	}).join("");
-}
-
-// See <https://stackoverflow.com/a/71083193>.
-
-function hex2buf(hexString) {
-	return new Uint8Array(hexString.match(/../g).map(function(h) {
-		return parseInt(h, 16);
-	})).buffer;
+	next.classList.remove("hidden");
 }
