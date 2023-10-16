@@ -194,7 +194,7 @@ if ($path == "/signup") {
 
 	// TODO: prevent SPAM without reCAPATCHA.
 
-	$qry = $db->p1repare("SELECT id, password FROM user WHERE username = ?");
+	$qry = $db->prepare("SELECT id, password FROM user WHERE username = ?");
 	$qry->execute(array($username));
 	$row = $qry->fetch();
 

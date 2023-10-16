@@ -68,6 +68,128 @@ document.addEventListener("click", function(event) {
 	}
 });
 
+// Database functions.
+
+// See <https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API>.
+
+function getDatabase(name = "seguros-web", version = 1) {
+	console.log("getDatabase");
+
+	return new Promise(function(resolve, reject) {
+		const request = self.indexedDB.open(name, version);
+
+		request.addEventListener("error", function(event) {
+			console.log("getDatabase.error");
+
+			const error = event.target.error;
+
+			reject(error);
+		});
+
+		request.addEventListener("upgradeneeded", function(event) {
+			console.log("getDatabase.upgradeneeded");
+
+			const db = event.target.result;
+
+			if (event.newVersion == 1) {
+				const userStore = db.createObjectStore("user", {keyPath: "id"});
+				userStore.createIndex("username", "username", {unique: true});
+
+				const itemStore = db.createObjectStore("item", {keyPath: "id"});
+				itemStore.createIndex("username", "username"); // not unique
+			}
+		});
+
+		request.addEventListener("success", function(event) {
+			console.log("getDatabase.success");
+
+			const db = event.target.result;
+
+			resolve(db);
+		});
+	});
+}
+
+function getDatabaseUser(user) {
+	console.log("getDatabaseUser");
+
+	return getDatabase().then(function(db) {
+		return new Promise(function(resolve, reject) {
+			const transaction = db.transaction("user");
+			const objectStore = transaction.objectStore("user");
+			const request = objectStore.get(user.id);
+
+			request.addEventListener("success", function(event) {
+				console.log("getDatabaseUser.success");
+
+				const record = event.target.result;
+				console.log("getDatabaseUser.record", record);
+
+				resolve(record);
+			});
+		});
+	});
+}
+
+function getDatabaseUserByUsername(user) {
+	console.log("getDatabaseUserByUsername");
+
+	return getDatabase().then(function(db) {
+		return new Promise(function(resolve, reject) {
+			const transaction = db.transaction("user");
+			const objectStore = transaction.objectStore("user");
+			const index = objectStore.index("username");
+			const request = index.get(user.username);
+
+			request.addEventListener("success", function(event) {
+				console.log("getDatabaseUserByUsername.success");
+
+				const record = event.target.result;
+				console.log("getDatabaseUserByUsername.record", record);
+
+				resolve(record);
+			});
+		});
+	});
+}
+
+function setDatabaseUser(user) {
+	console.log("setDatabaseUser");
+
+	return getDatabase().then(function(db) {
+		return new Promise(function(resolve, reject) {
+			const transaction = db.transaction(["user"], "readwrite");
+
+			transaction.addEventListener("error", function(event) {
+				console.log("setDatabaseUser.error");
+
+				const error = event.target.error;
+
+				reject(error);
+			});
+
+			transaction.addEventListener("complete", function(event) {
+				console.log("setDatabaseUser.complete");
+
+				//const transaction = event.target;
+
+				resolve(true);
+			});
+
+			const objectStore = transaction.objectStore("user");
+			const request = objectStore.add(user);
+
+			request.addEventListener("success", function(event) {
+				console.log("setDatabaseUser.success");
+
+				//const key = event.target.result;
+
+				//resolve(key);
+			});
+		});
+	});
+}
+
 // Dialog events.
 
 dialog1.addEventListener("click", function(event) {
@@ -103,6 +225,68 @@ function setDialog(textContent = "") {
 signup.addEventListener("submit", async function(event) {
 	console.log("signup.submit");
 	event.preventDefault();
+
+	event.submitter.disabled = true;
+
+	const id = self.crypto.randomUUID();
+	const username = event.target.username.value.trim();
+	const password = event.target.password.value.trim();
+	const confirmation = event.target.confirmation.value.trim();
+
+	if (!username.match(/[\w\-.]{8,}/)) {
+		setAlert("Username invalid");
+		event.submitter.disabled = null;
+		return;
+	}
+
+	if (!password.match(/[\w\x20-\x40]{8,}/)) {
+		setAlert("Invalid password");
+		event.submitter.disabled = null;
+		return;
+	}
+
+	if (password !== confirmation) {
+		setAlert("Invalid password confirmation");
+		event.submitter.disabled = null;
+		return;
+	}
+
+	// Hash the password so the server never touches it.
+
+	const encoder = new TextEncoder();
+	const encoded = encoder.encode(password);
+	const hash = await self.crypto.subtle.digest("SHA-256", encoded);
+	const hex = buf2hex(hash);
+
+	try {
+		const data = {id, username, password: hex, confirmation: hex};
+
+		const response = await self.fetch("/signup", {method: "POST",
+			headers: {"Content-Type": "application/json"},
+			body: JSON.stringify(data)
+		});
+
+		const result = await response.json();
+
+		if (result.error) {
+			throw result.error;
+		}
+
+		const user = {id, username, password: hash};
+
+		//await setDatabaseUser(user);
+	}
+	catch(error) {
+		console.log(error);
+		setDialog(error);
+		//setDialog("Username already signed up");
+		event.submitter.disabled = null;
+		return;
+	}
+
+	setDialog("Done");
+
+	event.submitter.disabled = null;
 });
 
 signin.addEventListener("submit", async function(event) {
@@ -148,4 +332,22 @@ function setPage(id = null) {
 	const next = document.getElementById(currentId);
 
 	next.classList.remove("hidden");
+}
+
+// Utils.
+
+// See <https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/digest#converting_a_digest_to_a_hex_string>.
+
+function buf2hex(arrayBuffer) {
+	return Array.from(new Uint8Array(arrayBuffer)).map(function(b) {
+		return b.toString(16).padStart(2, "0");
+	}).join("");
+}
+
+// See <https://stackoverflow.com/a/71083193>.
+
+function hex2buf(hexString) {
+	return new Uint8Array(hexString.match(/../g).map(function(h) {
+		return parseInt(h, 16);
+	})).buffer;
 }
