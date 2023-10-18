@@ -166,65 +166,22 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 // <https://stackoverflow.com/q/46483>.
 
 if ($path == "/signup") {
+	exit(json_encode(false));
+}
+
+if ($path == "/signin") {
+	exit(json_encode(false));
+}
+
+if ($path == "/test") {
 	$_post = json_decode(file_get_contents("php://input"), TRUE);
-	$id = isset($_post["id"]) ? $_post["id"] : "";
+
 	$username = isset($_post["username"]) ? mb_strtolower(trim($_post["username"])) : "";
-	$password = isset($_post["password"]) ? trim($_post["password"]) : "";
-	$confirmation = isset($_post["confirmation"]) ? trim($_post["confirmation"]) : "";
+	$signature = isset($_post["signature"]) ? $_post["signature"] : "";
+	$cypher = isset($_post["cypher"]) ? $_post["cypher"] : "";
+	$iv = isset($_post["iv"]) ? $_post["iv"] : "";
 
-	if (!$id) {
-		trigger_error("Invalid ID", E_USER_ERROR);
-	}
-
-	if (!preg_match("/[\w\-.]{8,}/", $username)) {
-		trigger_error("Invalid username", E_USER_ERROR);
-	}
-
-	if (!preg_match("/[\w\x20-\x40]{8,}/", $password)) {
-		trigger_error("Invalid password", E_USER_ERROR);
-	}
-
-	if ($password !== $confirmation) {
-		trigger_error("Invalid password confirmation", E_USER_ERROR);
-	}
-
-	// NOTE: disable sign ups.
-
-	//trigger_error("Sign up temporalily disabled", E_USER_ERROR);
-
-	// TODO: prevent SPAM without reCAPATCHA.
-
-	$qry = $db->prepare("SELECT id, password FROM user WHERE username = ?");
-	$qry->execute(array($username));
-	$row = $qry->fetch();
-
-	// User may be logging in from a new client or is a new user.
-
-	if ($row) {
-		if (password_verify($password, $row["password"])) {
-			$id = $row["id"];
-
-			if (password_needs_rehash($row["password"], PASSWORD_DEFAULT)) {
-				$password_hash = password_hash($password, PASSWORD_DEFAULT);
-				$qry = $db->prepare("UPDATE user SET password = ? WHERE username = ?");
-				$qry->execute(array($password_hash, $username));
-				//$count = $qry->rowCount();
-			}
-		}
-		else {
-			trigger_error("Username already signed up", E_USER_ERROR);
-		}
-	}
-	else {
-		$password_hash = password_hash($password, PASSWORD_DEFAULT);
-		$qry = $db->prepare("INSERT INTO user (id, username, password) VALUES (?, ?, ?)");
-		$qry->execute(array($id, $username, $password_hash));
-		//$id = $db->lastInsertId();
-	}
-
-	$response = array("user_id" => $id);
-
-	$_SESSION["user_id"] = $id;
+	$response = array("username" => $username, "signature" => $signature, "cypher" => $cypher, "iv" => $iv);
 
 	exit(json_encode($response));
 }

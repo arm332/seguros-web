@@ -1,136 +1,44 @@
-/* Not using *::before or *::after pseudo-elements.
- */
 * {
 	box-sizing: border-box;
 }
 
-/* To style links appropriately, put the :visited rule after the :link rule
- * but before the :hover and :active rules, as defined by the LVHA-order:
- * :link — :visited — :hover — :active. The :visited pseudo-class and :link
- * pseudo-class are mutually exclusive.
- * See <https://developer.mozilla.org/en-US/docs/Web/CSS/:link>.
- *
- * Never just remove the focus outline (visible focus indicator) without
- * replacing it with a focus outline that will pass WCAG 2.1 SC 1.4.11
- * Non-Text Contrast.
- * See <https://developer.mozilla.org/en-US/docs/Web/CSS/:focus>.
- */
-:visited, :hover, :active, :focus {
-	border-color: AccentColor;
-	outline: none;
-}
-
-/* To opt the entire page into the user's color scheme preferences declare
- * color-scheme on the :root element.
- * See <https://developer.mozilla.org/en-US/docs/Web/CSS/color-scheme>.
- */
 :root {
 	color-scheme: light dark;
+}
+
+body {
 	font: 16px/1.5 system-ui, sans-serif;
-}
-
-section {
-	display: flex;
-	flex-direction: column;
-	position: fixed;
-	top: 0;
-	right: 0;
-	bottom: 0;
-	left: 0;
-}
-
-header {
-	background: AccentColor;
-	color: AccentColorText;
-	display: flex;
-}
-
-header a {
-	padding: 1rem;
-}
-
-header h1 {
-	flex-grow: 1;
-	font-size: 1.5rem;
-	margin: 0.625rem 1rem;
+	margin: 0;
 }
 
 form {
 	display: flex;
 	flex-direction: column;
-	flex-grow: 1;
-	gap: 0.5rem;
 }
 
-footer p {
-	font-size: 0.9rem;
-	margin: 1.075rem 1rem;
-}
-
-dialog {
-	background: ButtonFace;
-	border: 1px solid ButtonBorder;
-	border-radius: 0.25rem;
-	box-shadow: 0.25rem 0.25rem 0.5rem #00000066;
+h1, h2, h3, p {
 	margin: 1rem;
-	position: fixed;
-	top: auto;
-	right: 0;
-	bottom: 0;
-	left: 0;
-	width: auto;
 }
 
-dialog::backdrop {
-	background: #0006;
-}
-
-button, input, textarea {
-	border: 1px solid ButtonBorder;
+input {
+	border: 0.0625rem solid ButtonBorder; /* 0.0625rem = 1px */
 	border-radius: 0.25rem;
 	font: inherit;
-	margin: 0 1rem;
-	padding: 0.5rem;
+	margin: 0.25rem 1rem;
+	padding: 0.25rem;
 }
 
-h2 {
-	font-size: 1.3rem;
-	margin: 0.775rem 1rem;
+input:focus {
+	border-color: AccentColor;
+	outline: 0;
 }
 
-h3, p {
-	margin: 1rem;
+input[type="submit"] {
+	background: ButtonFace;
+	color: ButtonText;
+	cursor: pointer;
 }
 
-.hidden {
-	display: none;
-}
-
-/* Note: The :hover pseudo-class is problematic on touchscreens. Depending on
- * the browser, the :hover pseudo-class might never match, match only for a
- * moment after touching an element, or continue to match even after the user
- * has stopped touching and until the user touches another element.
- * See <https://developer.mozilla.org/en-US/docs/Web/CSS/:hover>. */
-
-@media (hover: hover) {
-	a {
-		color: inherit;
-		text-decoration: none;
-	}
-
-	a:focus, a:hover {
-		text-decoration: underline;
-	}
-
-	header a:focus, header a:hover {
-		background: Highlight;
-		color: HighlightText;
-	}
-}
-
-@media (min-width: 40rem) {
-	article, form {
-		margin: 0 auto;
-		width: 40rem;
-	}
+input[type="submit"]:hover {
+	filter: brightness(1.25); /* https://stackoverflow.com/a/3280990 */
 }
